@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Card Background -->
+  <rect x="20" y="40" width="160" height="120" rx="10" ry="10" fill="#000000" />
+  
+  <!-- Card Chip -->
+  <rect x="40" y="70" width="30" height="25" rx="3" ry="3" fill="#ffffff" opacity="0.8" />
+  
+  <!-- Card Number Lines -->
+  <rect x="40" y="110" width="120" height="5" rx="2" ry="2" fill="#ffffff" opacity="0.6" />
+  <rect x="40" y="125" width="80" height="5" rx="2" ry="2" fill="#ffffff" opacity="0.6" />
+  
+  <!-- Card Magnetic Strip -->
+  <rect x="20" y="80" width="160" height="20" fill="#ffffff" opacity="0.2" />
+  
+  <!-- Lock Icon -->
+  <circle cx="150" cy="70" r="15" fill="#ffffff" />
+  <rect x="145" y="65" width="10" height="15" rx="5" ry="5" fill="#000000" />
+  <rect x="142" y="75" width="16" height="8" rx="2" ry="2" fill="#000000" />
+  
+  <!-- Vault Door Lines (for vault concept) -->
+  <rect x="30" y="50" width="140" height="2" fill="#ffffff" opacity="0.4" />
+  <rect x="30" y="60" width="140" height="2" fill="#ffffff" opacity="0.3" />
+  <rect x="30" y="150" width="140" height="2" fill="#ffffff" opacity="0.3" />
+</svg>

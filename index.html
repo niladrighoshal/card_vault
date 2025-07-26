@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#000000">
+    <title>Card Vault - Secure Card Storage</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="images/icons/icon-192x192.png">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Lock Screen -->
+        <div id="lock-screen" class="screen active">
+            <div class="lock-container">
+                <div class="app-logo">
+                    <img src="images/logo.svg" alt="Card Vault Logo">
+                    <h1>Card Vault</h1>
+                </div>
+                <div class="auth-container">
+                    <div class="pin-container">
+                        <h2>Enter PIN</h2>
+                        <div class="pin-dots">
+                            <span class="pin-dot"></span>
+                            <span class="pin-dot"></span>
+                            <span class="pin-dot"></span>
+                            <span class="pin-dot"></span>
+                        </div>
+                        <div class="pin-pad">
+                            <button class="pin-button" data-value="1">1</button>
+                            <button class="pin-button" data-value="2">2</button>
+                            <button class="pin-button" data-value="3">3</button>
+                            <button class="pin-button" data-value="4">4</button>
+                            <button class="pin-button" data-value="5">5</button>
+                            <button class="pin-button" data-value="6">6</button>
+                            <button class="pin-button" data-value="7">7</button>
+                            <button class="pin-button" data-value="8">8</button>
+                            <button class="pin-button" data-value="9">9</button>
+                            <button class="pin-button pin-clear">Clear</button>
+                            <button class="pin-button" data-value="0">0</button>
+                            <button class="pin-button pin-enter">Enter</button>
+                        </div>
+                    </div>
+                    <div class="biometric-container">
+                        <button id="biometric-button" class="biometric-button">
+                            <i class="fas fa-fingerprint"></i>
+                            <span>Use Fingerprint</span>
+                        </button>
+                    </div>
+                    <div id="setup-pin-container" class="setup-pin-container hidden">
+                        <h2>Set Up PIN</h2>
+                        <p>Create a 4-digit PIN to secure your cards</p>
+                        <div class="pin-setup-form">
+                            <input type="password" id="new-pin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="Enter 4-digit PIN">
+                            <input type="password" id="confirm-pin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="Confirm PIN">
+                            <button id="save-pin-button">Save PIN</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App Screen -->
+        <div id="main-screen" class="screen">
+            <!-- Card Stack -->
+            <div class="card-stack-container">
+                <div class="card-stack" id="card-stack">
+                    <!-- Cards will be added here dynamically -->
+                    <div class="empty-state" id="empty-state">
+                        <i class="fas fa-credit-card"></i>
+                        <p>No cards added yet</p>
+                        <button id="add-first-card" class="add-card-button">
+                            <i class="fas fa-plus"></i> Add Your First Card
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Card Button (Floating) -->
+            <button id="add-card-floating" class="floating-button">
+                <i class="fas fa-plus"></i>
+            </button>
+
+            <!-- Bottom Navigation -->
+            <div class="bottom-nav">
+                <button class="nav-button active" data-screen="credit-cards">
+                    <i class="fas fa-credit-card"></i>
+                    <span>CC</span>
+                </button>
+                <button class="nav-button" data-screen="debit-cards">
+                    <i class="fas fa-money-check"></i>
+                    <span>DC</span>
+                </button>
+                <button class="nav-button" data-screen="profile">
+                    <i class="fas fa-user"></i>
+                    <span>Profile</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Add Card Screen -->
+        <div id="add-card-screen" class="screen">
+            <div class="screen-header">
+                <button class="back-button">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2>Add New Card</h2>
+            </div>
+            <div class="add-card-form">
+                <div class="card-preview">
+                    <div class="card-template" id="card-preview">
+                        <div class="card-chip"></div>
+                        <div class="card-number">•••• •••• •••• ••••</div>
+                        <div class="card-details">
+                            <div class="card-valid">
+                                <span class="valid-label">Valid From</span>
+                                <span class="valid-date" id="preview-valid-from">MM/YY</span>
+                            </div>
+                            <div class="card-valid">
+                                <span class="valid-label">Valid Thru</span>
+                                <span class="valid-date" id="preview-valid-thru">MM/YY</span>
+                            </div>
+                        </div>
+                        <div class="card-holder" id="preview-card-name">CARD HOLDER NAME</div>
+                        <div class="card-bank" id="preview-bank-name">BANK NAME</div>
+                    </div>
+                </div>
+                <form id="card-form">
+                    <div class="form-group">
+                        <label for="card-type">Card Type</label>
+                        <select id="card-type" required>
+                            <option value="credit">Credit Card</option>
+                            <option value="debit">Debit Card</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="card-nickname">Card Nickname (Optional)</label>
+                        <input type="text" id="card-nickname" placeholder="e.g., Shopping Card">
+                    </div>
+                    <div class="form-group">
+                        <label for="card-number">Card Number</label>
+                        <input type="text" id="card-number" placeholder="1234 5678 9012 3456" maxlength="19" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label for="valid-from">Valid From</label>
+                            <input type="text" id="valid-from" placeholder="MM/YY" maxlength="5" required>
+                        </div>
+                        <div class="form-group half">
+                            <label for="valid-thru">Valid Thru</label>
+                            <input type="text" id="valid-thru" placeholder="MM/YY" maxlength="5" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="card-name">Name on Card</label>
+                        <input type="text" id="card-name" placeholder="JOHN DOE" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="bank-name">Bank Name</label>
+                        <input type="text" id="bank-name" placeholder="BANK NAME" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="card-cvv">CVV</label>
+                        <input type="password" id="card-cvv" placeholder="123" maxlength="4" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="card-color">Card Color</label>
+                        <input type="color" id="card-color" value="#1e3a8a">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="cancel-button">Cancel</button>
+                        <button type="submit" class="save-button">Save Card</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Card Detail Screen -->
+        <div id="card-detail-screen" class="screen">
+            <div class="screen-header">
+                <button class="back-button">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2 id="detail-card-nickname">Card Details</h2>
+                <button class="edit-button">
+                    <i class="fas fa-edit"></i>
+                </button>
+            </div>
+            <div class="card-detail-container">
+                <div class="card-detail-view">
+                    <div class="card-template" id="detail-card-view">
+                        <div class="card-chip"></div>
+                        <div class="card-number" id="detail-card-number">•••• •••• •••• ••••</div>
+                        <div class="card-details">
+                            <div class="card-valid">
+                                <span class="valid-label">Valid From</span>
+                                <span class="valid-date" id="detail-valid-from">MM/YY</span>
+                            </div>
+                            <div class="card-valid">
+                                <span class="valid-label">Valid Thru</span>
+                                <span class="valid-date" id="detail-valid-thru">MM/YY</span>
+                            </div>
+                        </div>
+                        <div class="card-holder" id="detail-card-name">CARD HOLDER NAME</div>
+                        <div class="card-bank" id="detail-bank-name">BANK NAME</div>
+                    </div>
+                </div>
+                <div class="card-security-details">
+                    <div class="security-item">
+                        <span class="security-label">CVV</span>
+                        <div class="security-value-container">
+                            <span class="security-value masked" id="detail-cvv">•••</span>
+                            <button class="toggle-visibility" id="toggle-cvv">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="security-item">
+                        <span class="security-label">Card Number</span>
+                        <div class="security-value-container">
+                            <span class="security-value masked" id="detail-full-number">•••• •••• •••• ••••</span>
+                            <button class="toggle-visibility" id="toggle-number">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button class="delete-card-button" id="delete-card-button">
+                        <i class="fas fa-trash"></i> Delete Card
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Screen -->
+        <div id="profile-screen" class="screen">
+            <div class="screen-header">
+                <h2>Profile</h2>
+            </div>
+            <div class="profile-container">
+                <div class="profile-section">
+                    <h3>Personal Information</h3>
+                    <form id="profile-form">
+                        <div class="form-group">
+                            <label for="user-name">Your Name</label>
+                            <input type="text" id="user-name" placeholder="Enter your name">
+                        </div>
+                        <div class="form-group">
+                            <label for="user-email">Email (Optional)</label>
+                            <input type="email" id="user-email" placeholder="Enter your email">
+                        </div>
+                        <button type="submit" class="save-button">Save Profile</button>
+                    </form>
+                </div>
+                <div class="profile-section">
+                    <h3>Security</h3>
+                    <button id="change-pin-button" class="action-button">
+                        <i class="fas fa-key"></i> Change PIN
+                    </button>
+                    <div class="toggle-container">
+                        <span>Enable Biometric Authentication</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="biometric-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="profile-section">
+                    <h3>App Information</h3>
+                    <div class="info-item">
+                        <span>Version</span>
+                        <span>1.0.0</span>
+                    </div>
+                    <a href="mailto:niladrighoshal.20@gmail.com" class="action-button">
+                        <i class="fas fa-envelope"></i> Request Feature
+                    </a>
+                </div>
+                <div class="profile-footer">
+                    <p>Made with <i class="fas fa-heart"></i> by Niladri</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Change PIN Screen -->
+        <div id="change-pin-screen" class="screen">
+            <div class="screen-header">
+                <button class="back-button">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2>Change PIN</h2>
+            </div>
+            <div class="change-pin-container">
+                <form id="change-pin-form">
+                    <div class="form-group">
+                        <label for="current-pin">Current PIN</label>
+                        <input type="password" id="current-pin" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="Enter current PIN" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="new-pin-change">New PIN</label>
+                        <input type="password" id="new-pin-change" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="Enter new PIN" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm-pin-change">Confirm New PIN</label>
+                        <input type="password" id="confirm-pin-change" maxlength="4" pattern="[0-9]*" inputmode="numeric" placeholder="Confirm new PIN" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="cancel-button">Cancel</button>
+                        <button type="submit" class="save-button">Update PIN</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal" id="confirmation-modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Confirm Action</h3>
+            <p id="modal-message">Are you sure you want to proceed?</p>
+            <div class="modal-actions">
+                <button id="modal-cancel" class="cancel-button">Cancel</button>
+                <button id="modal-confirm" class="confirm-button">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <span id="toast-message"></span>
+    </div>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+    </script>
+
+    <!-- App Scripts -->
+    <script src="js/crypto.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
