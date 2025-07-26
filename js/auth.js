@@ -204,7 +204,7 @@ const AuthModule = (() => {
                 await StorageModule.saveSettings({
                     ...settings,
                     biometricEnabled: true,
-                    biometricKey: btoa(CryptoModule.arrayBufferToString(this._currentEncryptionKey))
+                    biometricKey: btoa(CryptoModule.arrayBufferToString(encryptionKey))
                 });
                 
                 return true;

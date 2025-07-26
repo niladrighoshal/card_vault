@@ -265,6 +265,11 @@ const CryptoModule = (() => {
         }
     };
     
+    // Convert ArrayBuffer to string (needed for biometric auth)
+    const arrayBufferToString = (buffer) => {
+        return ab2str(buffer);
+    };
+    
     // Public API
     return {
         init,
@@ -272,6 +277,7 @@ const CryptoModule = (() => {
         decrypt,
         hashPin,
         verifyPin,
-        generateEncryptionKey
+        generateEncryptionKey,
+        arrayBufferToString
     };
 })();
