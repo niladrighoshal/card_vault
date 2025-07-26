@@ -250,7 +250,7 @@ const UIModule = (() => {
         // Back buttons
         elements.backButtons.forEach(button => {
             button.addEventListener('click', () => {
-                if (currentScreen === 'addCard' || currentScreen === 'cardDetail' || currentScreen === 'changePin') {
+                if (currentScreen === 'addCard' || currentScreen === 'cardDetail' || currentScreen === 'changePin' || currentScreen === 'profile') {
                     showScreen('main');
                 }
             });
