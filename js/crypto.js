@@ -278,6 +278,8 @@ const CryptoModule = (() => {
         hashPin,
         verifyPin,
         generateEncryptionKey,
-        arrayBufferToString
+        arrayBufferToString,
+        arrayBufferToBase64,
+        base64ToArrayBuffer
     };
 })();

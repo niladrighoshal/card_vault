@@ -125,10 +125,18 @@ const AuthModule = (() => {
     };
     
     // Check if biometric authentication is available
-    const isBiometricAvailable = () => {
-        return navigator.credentials && 
-               typeof PublicKeyCredential !== 'undefined' && 
-               PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable;
+    const isBiometricAvailable = async () => {
+        if (window.PublicKeyCredential &&
+            PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
+            try {
+                const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+                return isAvailable;
+            } catch (error) {
+                console.error('Error checking biometric availability:', error);
+                return false;
+            }
+        }
+        return false;
     };
     
     // Check if biometric authentication is enabled
@@ -152,7 +160,7 @@ const AuthModule = (() => {
                 throw new Error('PIN is incorrect');
             }
             
-            if (!isBiometricAvailable()) {
+            if (!await isBiometricAvailable()) {
                 throw new Error('Biometric authentication not available on this device');
             }
             
@@ -201,10 +209,11 @@ const AuthModule = (() => {
                 }
                 
                 // Update settings
+                const credentialId = btoa(String.fromCharCode.apply(null, new Uint8Array(credential.rawId)));
                 await StorageModule.saveSettings({
                     ...settings,
                     biometricEnabled: true,
-                    biometricKey: btoa(CryptoModule.arrayBufferToString(this._currentEncryptionKey))
+                    biometricCredentialId: credentialId
                 });
                 
                 return true;
@@ -247,60 +256,45 @@ const AuthModule = (() => {
     // Authenticate with biometrics
     const authenticateWithBiometric = async () => {
         try {
-            if (!isBiometricAvailable()) {
+            if (!await isBiometricAvailable()) {
                 throw new Error('Biometric authentication not available');
             }
-            
+
             const settings = await StorageModule.getSettings();
-            
-            if (!settings || !settings.biometricEnabled) {
+
+            if (!settings || !settings.biometricEnabled || !settings.biometricCredentialId) {
                 throw new Error('Biometric authentication not enabled');
             }
-            
-            // Create the WebAuthn options
+
             const challengeBytes = new Uint8Array(32);
             window.crypto.getRandomValues(challengeBytes);
-            
+
+            const credentialId = CryptoModule.base64ToArrayBuffer(settings.biometricCredentialId);
+
             const options = {
                 publicKey: {
                     challenge: challengeBytes,
+                    allowCredentials: [{
+                        type: 'public-key',
+                        id: credentialId,
+                    }],
                     timeout: 60000,
                     userVerification: 'required',
-                    // Don't set rpId to allow same-origin authentication
-                    // This is important for localhost testing
-                    // rpId: window.location.hostname
                 }
             };
-            
+
             try {
-                // Request biometric authentication
                 const credential = await navigator.credentials.get(options);
-                
+
                 if (!credential) {
                     throw new Error('Biometric authentication failed');
                 }
-                
-                // If successful, decrypt the master key with the stored PIN
-                // In a real app, we'd use a more secure approach, but for this demo
-                // we'll use the PIN that's stored in memory if available
-                if (currentPin) {
-                    const masterKey = await CryptoModule.decrypt(settings.encryptedMasterKey, currentPin);
-                    isAuthenticated = true;
-                    encryptionKey = masterKey;
-                    return true;
-                } else {
-                    // This is a fallback that's not ideal for security
-                    // In a real app, we'd use a more secure approach
-                    const dummyPin = '0000'; // This is just for demo purposes
-                    try {
-                        const masterKey = await CryptoModule.decrypt(settings.encryptedMasterKey, dummyPin);
-                        isAuthenticated = true;
-                        encryptionKey = masterKey;
-                        return true;
-                    } catch {
-                        throw new Error('Biometric authentication failed');
-                    }
-                }
+
+                // If biometric is successful, we still need the PIN to decrypt the master key.
+                // This function will now simply return true, and the UI will handle asking for the PIN.
+                // This is a more secure flow.
+                return true;
+
             } catch (error) {
                 console.error('WebAuthn error:', error);
                 throw new Error('Biometric authentication failed: ' + (error.message || 'Unknown error'));
@@ -340,7 +334,7 @@ const AuthModule = (() => {
     const init = async () => {
         try {
             // Check if biometric is available
-            const biometricAvailable = isBiometricAvailable();
+        const biometricAvailable = await isBiometricAvailable();
             console.log('Biometric authentication available:', biometricAvailable);
             
             return true;
