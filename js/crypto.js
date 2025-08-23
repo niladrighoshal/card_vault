@@ -81,69 +81,104 @@ const CryptoModule = (() => {
         );
     };
     
-    // Encrypt data with a password
-    const encrypt = async (data, password) => {
+    // Encrypt data with a password (used for master key)
+    const encryptWithPassword = async (data, password) => {
         try {
-            // Generate salt and IV
             const salt = generateSalt();
             const iv = generateIV();
-            
-            // Derive key from password
             const key = await deriveKey(password, salt);
             
-            // Encrypt the data
             const dataBuffer = typeof data === 'string' ? str2ab(data) : data;
-            const encryptedData = await window.crypto.subtle.encrypt(
-                {
-                    name: ALGORITHM,
-                    iv: iv
-                },
-                key,
-                dataBuffer
-            );
+            const encryptedData = await window.crypto.subtle.encrypt({ name: ALGORITHM, iv }, key, dataBuffer);
             
-            // Combine salt, IV, and encrypted data
-            const result = {
+            return JSON.stringify({
                 salt: arrayBufferToBase64(salt),
                 iv: arrayBufferToBase64(iv),
                 data: arrayBufferToBase64(encryptedData)
-            };
-            
-            return JSON.stringify(result);
+            });
         } catch (error) {
-            console.error('Encryption error:', error);
-            throw new Error('Failed to encrypt data');
+            console.error('Encryption with password error:', error);
+            throw new Error('Failed to encrypt data with password');
         }
     };
-    
-    // Decrypt data with a password
-    const decrypt = async (encryptedObj, password) => {
+
+    // Decrypt data with a password (used for master key)
+    const decryptWithPassword = async (encryptedObj, password) => {
         try {
-            // Parse the encrypted object
             const parsedObj = typeof encryptedObj === 'string' ? JSON.parse(encryptedObj) : encryptedObj;
-            
-            // Extract salt, IV, and encrypted data
             const salt = base64ToArrayBuffer(parsedObj.salt);
             const iv = base64ToArrayBuffer(parsedObj.iv);
             const encryptedData = base64ToArrayBuffer(parsedObj.data);
             
-            // Derive key from password
             const key = await deriveKey(password, salt);
             
-            // Decrypt the data
-            const decryptedData = await window.crypto.subtle.decrypt(
-                {
-                    name: ALGORITHM,
-                    iv: new Uint8Array(iv)
-                },
-                key,
-                encryptedData
+            const decryptedData = await window.crypto.subtle.decrypt({ name: ALGORITHM, iv: new Uint8Array(iv) }, key, encryptedData);
+
+            return ab2str(decryptedData);
+        } catch (error) {
+            console.error('Decryption with password error:', error);
+            throw new Error('Failed to decrypt data with password');
+        }
+    };
+
+    // Import a base64 encoded key
+    const importEncryptionKey = async (keyB64) => {
+        try {
+            const keyBuffer = base64ToArrayBuffer(keyB64);
+            return await window.crypto.subtle.importKey(
+                'raw',
+                keyBuffer,
+                { name: ALGORITHM },
+                true,
+                ['encrypt', 'decrypt']
             );
+        } catch (error) {
+            console.error('Key import error:', error);
+            throw new Error('Failed to import encryption key');
+        }
+    };
+
+    // Encrypt data with an imported CryptoKey
+    const encryptWithKey = async (data, cryptoKey) => {
+        try {
+            const iv = generateIV();
+            const dataBuffer = typeof data === 'string' ? str2ab(data) : data;
+            const encryptedData = await window.crypto.subtle.encrypt({ name: ALGORITHM, iv }, cryptoKey, dataBuffer);
+
+            return JSON.stringify({
+                iv: arrayBufferToBase64(iv),
+                data: arrayBufferToBase64(encryptedData)
+            });
+        } catch (error) {
+            console.error('Encryption with key error:', error);
+            throw new Error('Failed to encrypt data with key');
+        }
+    };
+
+    // Decrypt data with an imported CryptoKey
+    const decryptWithKey = async (encryptedObj, cryptoKey) => {
+        try {
+            const parsedObj = typeof encryptedObj === 'string' ? JSON.parse(encryptedObj) : encryptedObj;
+            const iv = base64ToArrayBuffer(parsedObj.iv);
+            const encryptedData = base64ToArrayBuffer(parsedObj.data);
+
+            const decryptedData = await window.crypto.subtle.decrypt({ name: ALGORITHM, iv: new Uint8Array(iv) }, cryptoKey, encryptedData);
             
             return ab2str(decryptedData);
         } catch (error) {
-            console.error('Decryption error:', error);
-            throw new Error('Failed to decrypt data');
+            console.error('Decryption with key error:', error);
+            throw new Error('Failed to decrypt data with key');
+        }
+    };
+
+    // Export a CryptoKey to a base64 string
+    const exportEncryptionKey = async (cryptoKey) => {
+        try {
+            const rawKey = await window.crypto.subtle.exportKey('raw', cryptoKey);
+            return arrayBufferToBase64(rawKey);
+        } catch (error) {
+            console.error('Key export error:', error);
+            throw new Error('Failed to export encryption key');
         }
     };
     
@@ -273,8 +308,12 @@ const CryptoModule = (() => {
     // Public API
     return {
         init,
-        encrypt,
-        decrypt,
+        encryptWithPassword,
+        decryptWithPassword,
+        importEncryptionKey,
+        exportEncryptionKey,
+        encryptWithKey,
+        decryptWithKey,
         hashPin,
         verifyPin,
         generateEncryptionKey,

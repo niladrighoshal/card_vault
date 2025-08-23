@@ -300,17 +300,18 @@ const UIModule = (() => {
     // Authenticate with biometric
     const authenticateWithBiometric = async () => {
         try {
-            const isAuthenticated = await AuthModule.authenticateWithBiometric();
+            const isSuccess = await AuthModule.authenticateWithBiometric();
             
-            if (isAuthenticated) {
-                showScreen('main');
-                loadCards();
+            if (isSuccess) {
+                showToast('Biometric successful. Please enter your PIN to unlock.');
+                // The existing PIN input logic will handle the final unlock step.
             } else {
-                showToast('Biometric authentication failed');
+                // This path is unlikely if errors are thrown, but for completeness:
+                showToast('Biometric authentication failed.');
             }
         } catch (error) {
             console.error('Biometric authentication error:', error);
-            showToast('Biometric authentication failed');
+            showToast(error.message || 'Biometric authentication failed.');
         }
     };
     
@@ -915,10 +916,18 @@ const UIModule = (() => {
         }, duration);
     };
     
+    // Reset to lock screen
+    const resetToLockScreen = () => {
+        enteredPin = '';
+        updatePinDots();
+        showScreen('lock');
+    };
+
     // Public API
     return {
         init,
         showScreen,
-        showToast
+        showToast,
+        resetToLockScreen
     };
 })();

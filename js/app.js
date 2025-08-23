@@ -39,3 +39,17 @@ if ('serviceWorker' in navigator) {
             });
     });
 }
+
+// Handle app resume to enforce security
+document.addEventListener('visibilitychange', () => {
+    // If the page becomes visible again and the user was authenticated, force a re-lock.
+    if (document.visibilityState === 'visible' && AuthModule.checkAuthenticated()) {
+        console.log('App resumed, forcing re-authentication.');
+
+        // Log out to clear the sensitive encryption key from memory
+        AuthModule.logout();
+
+        // Reset the UI to the lock screen, clearing any state.
+        UIModule.resetToLockScreen();
+    }
+});

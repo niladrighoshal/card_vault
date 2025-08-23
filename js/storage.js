@@ -114,7 +114,7 @@ const StorageModule = (() => {
             const cardId = dataToEncrypt.id;
             delete dataToEncrypt.id;
 
-            const encryptedBlob = await CryptoModule.encrypt(JSON.stringify(dataToEncrypt), encryptionKey);
+            const encryptedBlob = await CryptoModule.encryptWithKey(JSON.stringify(dataToEncrypt), encryptionKey);
 
             const dataToStore = {
                 id: cardId,
@@ -163,7 +163,7 @@ const StorageModule = (() => {
 
                     for (const card of encryptedCards) {
                         try {
-                            const decryptedData = await CryptoModule.decrypt(card.encryptedData, encryptionKey);
+                            const decryptedData = await CryptoModule.decryptWithKey(card.encryptedData, encryptionKey);
                             const cardData = JSON.parse(decryptedData);
                             decryptedCards.push({
                                 id: card.id,
@@ -204,7 +204,7 @@ const StorageModule = (() => {
 
                     for (const card of encryptedCards) {
                         try {
-                            const decryptedData = await CryptoModule.decrypt(card.encryptedData, encryptionKey);
+                            const decryptedData = await CryptoModule.decryptWithKey(card.encryptedData, encryptionKey);
                             const cardData = JSON.parse(decryptedData);
                             decryptedCards.push({
                                 id: card.id,
@@ -241,7 +241,7 @@ const StorageModule = (() => {
                     const card = request.result;
                     if (card) {
                         try {
-                            const decryptedData = await CryptoModule.decrypt(card.encryptedData, encryptionKey);
+                            const decryptedData = await CryptoModule.decryptWithKey(card.encryptedData, encryptionKey);
                             const cardData = JSON.parse(decryptedData);
                             resolve({
                                 id: card.id,

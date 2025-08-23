@@ -38,19 +38,23 @@ const AuthModule = (() => {
             const masterKey = await CryptoModule.generateEncryptionKey();
             
             // Encrypt the master key with the PIN
-            const encryptedMasterKey = await CryptoModule.encrypt(masterKey, pin);
+            const encryptedMasterKey = await CryptoModule.encryptWithPassword(masterKey, pin);
             
+            // Generate a stable user ID for WebAuthn
+            const userId = 'user-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
             // Save to settings
             await StorageModule.saveSettings({
                 pinHash,
                 encryptedMasterKey,
                 setupComplete: true,
-                biometricEnabled: false
+                biometricEnabled: false,
+                userId: userId
             });
             
             // Set as authenticated
             isAuthenticated = true;
-            encryptionKey = masterKey;
+            encryptionKey = await CryptoModule.importEncryptionKey(masterKey);
             
             return true;
         } catch (error) {
@@ -73,11 +77,13 @@ const AuthModule = (() => {
             
             if (isValid) {
                 // Decrypt the master key
-                const masterKey = await CryptoModule.decrypt(settings.encryptedMasterKey, pin);
+                const masterKeyB64 = await CryptoModule.decryptWithPassword(settings.encryptedMasterKey, pin);
                 
+                // Import the key for use in encryption/decryption
+                encryptionKey = await CryptoModule.importEncryptionKey(masterKeyB64);
+
                 // Set as authenticated
                 isAuthenticated = true;
-                encryptionKey = masterKey;
             }
             
             return isValid;
@@ -108,7 +114,8 @@ const AuthModule = (() => {
             const pinHash = await CryptoModule.hashPin(newPin);
             
             // Re-encrypt the master key with the new PIN
-            const encryptedMasterKey = await CryptoModule.encrypt(encryptionKey, newPin);
+            const masterKeyB64 = await CryptoModule.exportEncryptionKey(encryptionKey);
+            const encryptedMasterKey = await CryptoModule.encryptWithPassword(masterKeyB64, newPin);
             
             // Save updated settings
             await StorageModule.saveSettings({
@@ -164,38 +171,39 @@ const AuthModule = (() => {
                 throw new Error('Biometric authentication not available on this device');
             }
             
-            // Create random challenge and user ID for WebAuthn registration
             const challengeBytes = new Uint8Array(32);
             window.crypto.getRandomValues(challengeBytes);
             
-            const userIdBytes = new Uint8Array(16);
-            window.crypto.getRandomValues(userIdBytes);
-            
-            // Get current settings
             const settings = await StorageModule.getSettings();
-            
+            if (!settings.userId) {
+                throw new Error('User ID not found. Please re-setup PIN.');
+            }
+
+            const userId = (new TextEncoder()).encode(settings.userId);
+
             // Create the WebAuthn credential options
             const options = {
                 publicKey: {
                     challenge: challengeBytes,
                     rp: {
-                        name: 'Card Vault'
-                        // Don't set id for localhost testing
+                        name: 'Card Vault',
+                        id: window.location.hostname
                     },
                     user: {
-                        id: userIdBytes,
-                        name: 'user',
+                        id: userId,
+                        name: settings.userId, // A user-friendly name
                         displayName: 'Card Vault User'
                     },
-                    pubKeyCredParams: [{
-                        type: 'public-key',
-                        alg: -7 // ES256
-                    }],
+                    pubKeyCredParams: [
+                        { type: "public-key", alg: -7 }, // ES256
+                        { type: "public-key", alg: -257 } // RS256
+                    ],
                     timeout: 60000,
                     attestation: 'none',
                     authenticatorSelection: {
-                        userVerification: 'required',
-                        authenticatorAttachment: 'platform'
+                        authenticatorAttachment: "platform",
+                        residentKey: "required",
+                        userVerification: 'required'
                     }
                 }
             };
@@ -280,6 +288,7 @@ const AuthModule = (() => {
                     }],
                     timeout: 60000,
                     userVerification: 'required',
+                    rpId: window.location.hostname
                 }
             };
 
