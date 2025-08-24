@@ -190,9 +190,11 @@ const UIModule = (() => {
                 
                 if (screen === 'credit-cards') {
                     cardFilter = 'credit';
+                    showScreen('main');
                     loadCards();
                 } else if (screen === 'debit-cards') {
                     cardFilter = 'debit';
+                    showScreen('main');
                     loadCards();
                 } else if (screen === 'profile') {
                     showScreen('profile');
@@ -381,23 +383,33 @@ const UIModule = (() => {
     // Load cards from storage
     const loadCards = async () => {
         try {
-            // Get cards by type
-            const cards = await StorageModule.getCardsByType(cardFilter);
+            const encryptionKey = AuthModule.getEncryptionKey();
+            if (!encryptionKey) throw new Error('Not authenticated');
+
+            // Get encrypted cards by type
+            const encryptedCards = await StorageModule.getEncryptedCardsByType(cardFilter);
             
             // Clear card stack
             elements.cardStack.innerHTML = '';
             
-            if (cards.length === 0) {
+            if (encryptedCards.length === 0) {
                 // Show empty state
                 elements.cardStack.appendChild(elements.emptyState);
                 return;
             }
             
-            // Create card elements
-            cards.forEach(card => {
-                const cardElement = createCardElement(card);
-                elements.cardStack.appendChild(cardElement);
-            });
+            // Decrypt and create card elements
+            for (const card of encryptedCards) {
+                try {
+                    const decryptedData = await CryptoModule.decryptWithKey(card.encryptedData, encryptionKey);
+                    const cardData = { id: card.id, ...JSON.parse(decryptedData) };
+                    const cardElement = createCardElement(cardData);
+                    elements.cardStack.appendChild(cardElement);
+                } catch (e) {
+                    console.error(`Failed to decrypt card ${card.id}`, e);
+                    // Optionally show a corrupted card element
+                }
+            }
         } catch (error) {
             console.error('Load cards error:', error);
             showToast('Failed to load cards');
@@ -451,14 +463,19 @@ const UIModule = (() => {
     // Show card details
     const showCardDetails = async (cardId) => {
         try {
-            const card = await StorageModule.getCardById(cardId);
+            const encryptionKey = AuthModule.getEncryptionKey();
+            if (!encryptionKey) throw new Error('Not authenticated');
+
+            const encryptedCard = await StorageModule.getEncryptedCardById(cardId);
+            const decryptedData = await CryptoModule.decryptWithKey(encryptedCard.encryptedData, encryptionKey);
+            const card = { id: encryptedCard.id, ...JSON.parse(decryptedData) };
+
             currentCardId = cardId;
             
             // Set card details
             elements.detailCardNickname.textContent = card.nickname || 'Card Details';
             elements.detailCardView.style.backgroundColor = card.color || '#1e3a8a';
             
-            // Calculate text color based on background color
             const color = card.color || '#1e3a8a';
             const r = parseInt(color.slice(1, 3), 16);
             const g = parseInt(color.slice(3, 5), 16);
@@ -467,7 +484,6 @@ const UIModule = (() => {
             const textColor = brightness > 128 ? '#000000' : '#ffffff';
             elements.detailCardView.style.color = textColor;
             
-            // Format card number to show only last 6 digits
             const cardNumber = card.cardNumber.replace(/\s/g, '');
             const maskedNumber = '•••• •••• ' + cardNumber.slice(-6).replace(/(\d{2})(\d{4})/, '$1 $2');
             
@@ -477,17 +493,14 @@ const UIModule = (() => {
             elements.detailCardName.textContent = card.cardName;
             elements.detailBankName.textContent = card.bankName;
             
-            // Set masked sensitive data
             elements.detailCvv.textContent = '•••';
             elements.detailCvv.classList.add('masked');
             elements.detailFullNumber.textContent = '•••• •••• •••• ••••';
             elements.detailFullNumber.classList.add('masked');
             
-            // Store encrypted data for later use
-            elements.detailCvv.dataset.encrypted = card.cvv;
-            elements.detailFullNumber.dataset.encrypted = card.cardNumber;
+            elements.detailCvv.dataset.value = card.cvv;
+            elements.detailFullNumber.dataset.value = card.cardNumber;
             
-            // Show card detail screen
             showScreen('cardDetail');
         } catch (error) {
             console.error('Show card details error:', error);
@@ -499,12 +512,12 @@ const UIModule = (() => {
     const toggleSensitiveData = async (elementId, timeout = 5000) => {
         try {
             const element = document.getElementById(elementId);
-            const encryptedData = element.dataset.encrypted;
+            const value = element.dataset.value;
             const toggleButton = element.nextElementSibling;
             
             if (element.classList.contains('masked')) {
                 // Show the data
-                element.textContent = encryptedData;
+                element.textContent = value;
                 element.classList.remove('masked');
                 toggleButton.innerHTML = '<i class="fas fa-eye-slash"></i>';
                 
@@ -559,7 +572,13 @@ const UIModule = (() => {
     // Edit card
     const editCard = async () => {
         try {
-            const card = await StorageModule.getCardById(currentCardId);
+            const encryptionKey = AuthModule.getEncryptionKey();
+            if (!encryptionKey) throw new Error('Not authenticated');
+
+            const encryptedCard = await StorageModule.getEncryptedCardById(currentCardId);
+            const decryptedData = await CryptoModule.decryptWithKey(encryptedCard.encryptedData, encryptionKey);
+            const card = { id: encryptedCard.id, ...JSON.parse(decryptedData) };
+
             editingCard = card;
             
             // Fill form with card data
@@ -643,7 +662,6 @@ const UIModule = (() => {
     // Save card
     const saveCard = async (event) => {
         event.preventDefault();
-        console.log('[UI] Save card form submitted.');
         
         try {
             // Get form values
@@ -659,7 +677,6 @@ const UIModule = (() => {
             
             // Validate form
             if (!cardNumber || !validFrom || !validThru || !cardName || !bankName || !cvv) {
-                console.log('[UI] Save card validation failed.');
                 showToast('Please fill in all required fields');
                 return;
             }
@@ -680,12 +697,29 @@ const UIModule = (() => {
             // If editing, add the ID
             if (editingCard) {
                 cardData.id = editingCard.id;
+                cardData.createdAt = editingCard.createdAt;
             }
+
+            const encryptionKey = AuthModule.getEncryptionKey();
+            if (!encryptionKey) {
+                showToast('Error: Not authenticated. Cannot save card.');
+                return;
+            }
+
+            const dataToEncrypt = { ...cardData };
+            delete dataToEncrypt.id;
+
+            const encryptedBlob = await CryptoModule.encryptWithKey(JSON.stringify(dataToEncrypt), encryptionKey);
+
+            const dataToStore = {
+                id: cardData.id,
+                type: cardData.type,
+                encryptedData: encryptedBlob,
+                createdAt: cardData.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
             
-            console.log('[UI] Calling StorageModule.saveCard with data:', cardData);
-            // Save card
-            await StorageModule.saveCard(cardData);
-            console.log('[UI] StorageModule.saveCard completed.');
+            const newId = await StorageModule.saveEncryptedCard(dataToStore);
             
             // Reset form and show main screen
             resetCardForm();
@@ -695,7 +729,7 @@ const UIModule = (() => {
             showToast(editingCard ? 'Card updated successfully' : 'Card added successfully');
             editingCard = null;
         } catch (error) {
-            console.error('[UI] Save card error:', error);
+            console.error('Save card error:', error);
             showToast('Failed to save card');
         }
     };
