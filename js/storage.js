@@ -101,74 +101,36 @@ const StorageModule = (() => {
         }
     };
     
-    // Save a card to the database
-    const saveCard = async (cardData) => {
+    // Save an encrypted card to the database
+    const saveEncryptedCard = async (dataToStore) => {
         try {
-            const encryptionKey = AuthModule.getEncryptionKey();
-            if (!encryptionKey) {
-                throw new Error('Not authenticated, cannot save card');
-            }
-
-            // Encrypt the card data, excluding some metadata
-            const dataToEncrypt = { ...cardData };
-            const cardId = dataToEncrypt.id;
-            delete dataToEncrypt.id;
-
-            const encryptedBlob = await CryptoModule.encryptWithKey(JSON.stringify(dataToEncrypt), encryptionKey);
-
-            const dataToStore = {
-                id: cardId,
-                type: cardData.type, // For filtering
-                encryptedData: encryptedBlob,
-                createdAt: cardData.createdAt || new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            };
-
             const store = await getStore(STORES.CARDS, 'readwrite');
 
             return new Promise((resolve, reject) => {
                 const request = store.put(dataToStore);
 
                 request.onsuccess = (event) => {
-                    const newId = event.target.result;
-                    resolve({ ...cardData, id: newId });
+                    resolve(event.target.result);
                 };
 
                 request.onerror = (event) => {
-                    console.error('Failed to save card to IndexedDB', event.target.error);
-                    reject('Failed to save card');
+                    console.error('Failed to save encrypted card to IndexedDB', event.target.error);
+                    reject('Failed to save encrypted card');
                 };
             });
         } catch (error) {
-            console.error('Save card error:', error);
+            console.error('Save encrypted card error:', error);
             throw error;
         }
     };
     
-    // Get all cards from the database
-    const getAllCards = async () => {
+    // Get all encrypted cards from the database
+    const getAllEncryptedCards = async () => {
         try {
-            const encryptionKey = AuthModule.getEncryptionKey();
-            if (!encryptionKey) throw new Error('Not authenticated, cannot get cards');
-
             const store = await getStore(STORES.CARDS);
             return new Promise((resolve, reject) => {
                 const request = store.getAll();
-                
-                request.onsuccess = async () => {
-                    const encryptedCards = request.result || [];
-                    const decryptedCards = [];
-                    for (const card of encryptedCards) {
-                        try {
-                            const decryptedData = await CryptoModule.decryptWithKey(card.encryptedData, encryptionKey);
-                            decryptedCards.push({ id: card.id, ...JSON.parse(decryptedData) });
-                        } catch (error) {
-                            console.error(`Failed to decrypt card ${card.id}:`, error);
-                        }
-                    }
-                    resolve(decryptedCards);
-                };
-                
+                request.onsuccess = () => resolve(request.result || []);
                 request.onerror = () => reject('Failed to get cards');
             });
         } catch (error) {
@@ -177,32 +139,15 @@ const StorageModule = (() => {
         }
     };
     
-    // Get cards by type (credit or debit)
-    const getCardsByType = async (type) => {
+    // Get encrypted cards by type (credit or debit)
+    const getEncryptedCardsByType = async (type) => {
         try {
-            const encryptionKey = AuthModule.getEncryptionKey();
-            if (!encryptionKey) throw new Error('Not authenticated, cannot get cards');
-
             const store = await getStore(STORES.CARDS);
             const index = store.index('type');
             
             return new Promise((resolve, reject) => {
                 const request = index.getAll(type);
-                
-                request.onsuccess = async () => {
-                    const encryptedCards = request.result || [];
-                    const decryptedCards = [];
-                    for (const card of encryptedCards) {
-                        try {
-                            const decryptedData = await CryptoModule.decryptWithKey(card.encryptedData, encryptionKey);
-                            decryptedCards.push({ id: card.id, ...JSON.parse(decryptedData) });
-                        } catch (error) {
-                            console.error(`Failed to decrypt card ${card.id}:`, error);
-                        }
-                    }
-                    resolve(decryptedCards);
-                };
-                
+                request.onsuccess = () => resolve(request.result || []);
                 request.onerror = () => reject(`Failed to get ${type} cards`);
             });
         } catch (error) {
@@ -211,31 +156,19 @@ const StorageModule = (() => {
         }
     };
     
-    // Get a card by ID
-    const getCardById = async (id) => {
+    // Get an encrypted card by ID
+    const getEncryptedCardById = async (id) => {
         try {
-            const encryptionKey = AuthModule.getEncryptionKey();
-            if (!encryptionKey) throw new Error('Not authenticated, cannot get card');
-
             const store = await getStore(STORES.CARDS);
             return new Promise((resolve, reject) => {
                 const request = store.get(id);
-                
-                request.onsuccess = async () => {
-                    const card = request.result;
-                    if (card) {
-                        try {
-                            const decryptedData = await CryptoModule.decryptWithKey(card.encryptedData, encryptionKey);
-                            resolve({ id: card.id, ...JSON.parse(decryptedData) });
-                        } catch (error) {
-                            console.error(`Failed to decrypt card ${id}:`, error);
-                            reject('Failed to decrypt card');
-                        }
+                request.onsuccess = () => {
+                    if (request.result) {
+                        resolve(request.result);
                     } else {
                         reject('Card not found');
                     }
                 };
-                
                 request.onerror = () => reject('Failed to get card');
             });
         } catch (error) {
@@ -343,10 +276,10 @@ const StorageModule = (() => {
         initDatabase,
         saveSettings,
         getSettings,
-        saveCard,
-        getAllCards,
-        getCardsByType,
-        getCardById,
+        saveEncryptedCard,
+        getAllEncryptedCards,
+        getEncryptedCardsByType,
+        getEncryptedCardById,
         deleteCard,
         saveProfile,
         getProfile,

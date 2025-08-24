@@ -240,7 +240,6 @@ body {
     flex: 1;
     padding: 20px;
     overflow-y: auto;
-    padding-bottom: 80px; /* Space for bottom nav */
 }
 
 .card-stack {
@@ -336,11 +335,12 @@ body {
     display: flex;
 }
 
-/* Add padding to scrollable screen content to avoid nav overlap */
-.add-card-form,
-.card-detail-container,
-.profile-container,
-.change-pin-container {
+/* Add padding to screens to avoid nav overlap */
+#main-screen .card-stack-container,
+#add-card-screen,
+#card-detail-screen,
+#profile-screen,
+#change-pin-screen {
     padding-bottom: 80px;
 }
 
