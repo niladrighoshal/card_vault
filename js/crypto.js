@@ -138,6 +138,17 @@ const CryptoModule = (() => {
         }
     };
 
+    // Export a CryptoKey to a base64 string
+    const exportEncryptionKey = async (cryptoKey) => {
+        try {
+            const rawKey = await window.crypto.subtle.exportKey('raw', cryptoKey);
+            return arrayBufferToBase64(rawKey);
+        } catch (error) {
+            console.error('Key export error:', error);
+            throw new Error('Failed to export encryption key');
+        }
+    };
+
     // Encrypt data with an imported CryptoKey
     const encryptWithKey = async (data, cryptoKey) => {
         try {
@@ -168,17 +179,6 @@ const CryptoModule = (() => {
         } catch (error) {
             console.error('Decryption with key error:', error);
             throw new Error('Failed to decrypt data with key');
-        }
-    };
-
-    // Export a CryptoKey to a base64 string
-    const exportEncryptionKey = async (cryptoKey) => {
-        try {
-            const rawKey = await window.crypto.subtle.exportKey('raw', cryptoKey);
-            return arrayBufferToBase64(rawKey);
-        } catch (error) {
-            console.error('Key export error:', error);
-            throw new Error('Failed to export encryption key');
         }
     };
     

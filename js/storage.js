@@ -149,9 +149,7 @@ const StorageModule = (() => {
     const getAllCards = async () => {
         try {
             const encryptionKey = AuthModule.getEncryptionKey();
-            if (!encryptionKey) {
-                throw new Error('Not authenticated, cannot get cards');
-            }
+            if (!encryptionKey) throw new Error('Not authenticated, cannot get cards');
 
             const store = await getStore(STORES.CARDS);
             return new Promise((resolve, reject) => {
@@ -160,15 +158,10 @@ const StorageModule = (() => {
                 request.onsuccess = async () => {
                     const encryptedCards = request.result || [];
                     const decryptedCards = [];
-
                     for (const card of encryptedCards) {
                         try {
                             const decryptedData = await CryptoModule.decryptWithKey(card.encryptedData, encryptionKey);
-                            const cardData = JSON.parse(decryptedData);
-                            decryptedCards.push({
-                                id: card.id,
-                                ...cardData
-                            });
+                            decryptedCards.push({ id: card.id, ...JSON.parse(decryptedData) });
                         } catch (error) {
                             console.error(`Failed to decrypt card ${card.id}:`, error);
                         }
@@ -188,9 +181,7 @@ const StorageModule = (() => {
     const getCardsByType = async (type) => {
         try {
             const encryptionKey = AuthModule.getEncryptionKey();
-            if (!encryptionKey) {
-                throw new Error('Not authenticated, cannot get cards');
-            }
+            if (!encryptionKey) throw new Error('Not authenticated, cannot get cards');
 
             const store = await getStore(STORES.CARDS);
             const index = store.index('type');
@@ -201,15 +192,10 @@ const StorageModule = (() => {
                 request.onsuccess = async () => {
                     const encryptedCards = request.result || [];
                     const decryptedCards = [];
-
                     for (const card of encryptedCards) {
                         try {
                             const decryptedData = await CryptoModule.decryptWithKey(card.encryptedData, encryptionKey);
-                            const cardData = JSON.parse(decryptedData);
-                            decryptedCards.push({
-                                id: card.id,
-                                ...cardData
-                            });
+                            decryptedCards.push({ id: card.id, ...JSON.parse(decryptedData) });
                         } catch (error) {
                             console.error(`Failed to decrypt card ${card.id}:`, error);
                         }
@@ -229,9 +215,7 @@ const StorageModule = (() => {
     const getCardById = async (id) => {
         try {
             const encryptionKey = AuthModule.getEncryptionKey();
-            if (!encryptionKey) {
-                throw new Error('Not authenticated, cannot get card');
-            }
+            if (!encryptionKey) throw new Error('Not authenticated, cannot get card');
 
             const store = await getStore(STORES.CARDS);
             return new Promise((resolve, reject) => {
@@ -242,11 +226,7 @@ const StorageModule = (() => {
                     if (card) {
                         try {
                             const decryptedData = await CryptoModule.decryptWithKey(card.encryptedData, encryptionKey);
-                            const cardData = JSON.parse(decryptedData);
-                            resolve({
-                                id: card.id,
-                                ...cardData
-                            });
+                            resolve({ id: card.id, ...JSON.parse(decryptedData) });
                         } catch (error) {
                             console.error(`Failed to decrypt card ${id}:`, error);
                             reject('Failed to decrypt card');

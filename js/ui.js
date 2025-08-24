@@ -4,6 +4,8 @@
  */
 
 const UIModule = (() => {
+    const appContainer = document.querySelector('.app-container');
+
     // Screen elements
     const screens = {
         lock: document.getElementById('lock-screen'),
@@ -282,6 +284,7 @@ const UIModule = (() => {
                 // Reset PIN and show main screen
                 enteredPin = '';
                 updatePinDots();
+                appContainer.classList.add('app-unlocked');
                 showScreen('main');
                 loadCards();
             } else {
@@ -338,6 +341,7 @@ const UIModule = (() => {
             
             // Hide setup container and show main screen
             elements.setupPinContainer.classList.add('hidden');
+            appContainer.classList.add('app-unlocked');
             showScreen('main');
             loadCards();
             
@@ -639,6 +643,7 @@ const UIModule = (() => {
     // Save card
     const saveCard = async (event) => {
         event.preventDefault();
+        console.log('[UI] Save card form submitted.');
         
         try {
             // Get form values
@@ -654,6 +659,7 @@ const UIModule = (() => {
             
             // Validate form
             if (!cardNumber || !validFrom || !validThru || !cardName || !bankName || !cvv) {
+                console.log('[UI] Save card validation failed.');
                 showToast('Please fill in all required fields');
                 return;
             }
@@ -676,8 +682,10 @@ const UIModule = (() => {
                 cardData.id = editingCard.id;
             }
             
+            console.log('[UI] Calling StorageModule.saveCard with data:', cardData);
             // Save card
             await StorageModule.saveCard(cardData);
+            console.log('[UI] StorageModule.saveCard completed.');
             
             // Reset form and show main screen
             resetCardForm();
@@ -687,7 +695,7 @@ const UIModule = (() => {
             showToast(editingCard ? 'Card updated successfully' : 'Card added successfully');
             editingCard = null;
         } catch (error) {
-            console.error('Save card error:', error);
+            console.error('[UI] Save card error:', error);
             showToast('Failed to save card');
         }
     };
@@ -918,6 +926,7 @@ const UIModule = (() => {
     
     // Reset to lock screen
     const resetToLockScreen = () => {
+        appContainer.classList.remove('app-unlocked');
         enteredPin = '';
         updatePinDots();
         showScreen('lock');

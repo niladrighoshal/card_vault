@@ -10,7 +10,7 @@ const AuthModule = (() => {
     
     // Variables to track authentication state
     let isAuthenticated = false;
-    let encryptionKey = null;
+    let encryptionKey = null; // This will be a CryptoKey object
     let currentPin = '';
     
     // Check if the app is set up with a PIN
@@ -31,30 +31,21 @@ const AuthModule = (() => {
                 throw new Error('PIN must be 4 digits');
             }
             
-            // Hash the PIN
             const pinHash = await CryptoModule.hashPin(pin);
-            
-            // Generate a master encryption key
-            const masterKey = await CryptoModule.generateEncryptionKey();
-            
-            // Encrypt the master key with the PIN
-            const encryptedMasterKey = await CryptoModule.encryptWithPassword(masterKey, pin);
-            
-            // Generate a stable user ID for WebAuthn
+            const masterKeyB64 = await CryptoModule.generateEncryptionKey();
+            const encryptedMasterKey = await CryptoModule.encryptWithPassword(masterKeyB64, pin);
             const userId = 'user-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 
-            // Save to settings
             await StorageModule.saveSettings({
                 pinHash,
                 encryptedMasterKey,
+                userId,
                 setupComplete: true,
                 biometricEnabled: false,
-                userId: userId
             });
             
-            // Set as authenticated
             isAuthenticated = true;
-            encryptionKey = await CryptoModule.importEncryptionKey(masterKey);
+            encryptionKey = await CryptoModule.importEncryptionKey(masterKeyB64);
             
             return true;
         } catch (error) {
@@ -67,22 +58,13 @@ const AuthModule = (() => {
     const verifyPin = async (pin) => {
         try {
             const settings = await StorageModule.getSettings();
-            
-            if (!settings || !settings.pinHash) {
-                throw new Error('PIN not set up');
-            }
-            
-            // Verify the PIN against stored hash
+            if (!settings || !settings.pinHash) throw new Error('PIN not set up');
+
             const isValid = await CryptoModule.verifyPin(pin, settings.pinHash);
             
             if (isValid) {
-                // Decrypt the master key
                 const masterKeyB64 = await CryptoModule.decryptWithPassword(settings.encryptedMasterKey, pin);
-                
-                // Import the key for use in encryption/decryption
                 encryptionKey = await CryptoModule.importEncryptionKey(masterKeyB64);
-
-                // Set as authenticated
                 isAuthenticated = true;
             }
             
@@ -96,33 +78,16 @@ const AuthModule = (() => {
     // Change PIN
     const changePin = async (currentPin, newPin) => {
         try {
-            // Verify current PIN
             const isValid = await verifyPin(currentPin);
-            
-            if (!isValid) {
-                throw new Error('Current PIN is incorrect');
-            }
-            
-            if (newPin.length !== PIN_LENGTH) {
-                throw new Error('PIN must be 4 digits');
-            }
-            
-            // Get current settings
+            if (!isValid) throw new Error('Current PIN is incorrect');
+            if (newPin.length !== PIN_LENGTH) throw new Error('PIN must be 4 digits');
+
             const settings = await StorageModule.getSettings();
-            
-            // Hash the new PIN
             const pinHash = await CryptoModule.hashPin(newPin);
-            
-            // Re-encrypt the master key with the new PIN
             const masterKeyB64 = await CryptoModule.exportEncryptionKey(encryptionKey);
             const encryptedMasterKey = await CryptoModule.encryptWithPassword(masterKeyB64, newPin);
             
-            // Save updated settings
-            await StorageModule.saveSettings({
-                ...settings,
-                pinHash,
-                encryptedMasterKey
-            });
+            await StorageModule.saveSettings({ ...settings, pinHash, encryptedMasterKey });
             
             return true;
         } catch (error) {
@@ -133,17 +98,12 @@ const AuthModule = (() => {
     
     // Check if biometric authentication is available
     const isBiometricAvailable = async () => {
-        if (window.PublicKeyCredential &&
-            PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
-            try {
-                const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-                return isAvailable;
-            } catch (error) {
-                console.error('Error checking biometric availability:', error);
-                return false;
-            }
+        try {
+            return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+        } catch (error) {
+            console.error('Error checking biometric availability:', error);
+            return false;
         }
-        return false;
     };
     
     // Check if biometric authentication is enabled
@@ -160,99 +120,51 @@ const AuthModule = (() => {
     // Enable biometric authentication
     const enableBiometric = async (pin) => {
         try {
-            // First verify PIN
             const isValid = await verifyPin(pin);
-            
-            if (!isValid) {
-                throw new Error('PIN is incorrect');
-            }
-            
-            if (!await isBiometricAvailable()) {
-                throw new Error('Biometric authentication not available on this device');
-            }
-            
+            if (!isValid) throw new Error('PIN is incorrect');
+            if (!(await isBiometricAvailable())) throw new Error('Biometric authentication not available on this device');
+
             const challengeBytes = new Uint8Array(32);
             window.crypto.getRandomValues(challengeBytes);
             
             const settings = await StorageModule.getSettings();
-            if (!settings.userId) {
-                throw new Error('User ID not found. Please re-setup PIN.');
-            }
+            if (!settings.userId) throw new Error('User ID not found. Please re-setup PIN.');
 
             const userId = (new TextEncoder()).encode(settings.userId);
 
-            // Create the WebAuthn credential options
             const options = {
                 publicKey: {
                     challenge: challengeBytes,
-                    rp: {
-                        name: 'Card Vault',
-                        id: window.location.hostname
-                    },
-                    user: {
-                        id: userId,
-                        name: settings.userId, // A user-friendly name
-                        displayName: 'Card Vault User'
-                    },
-                    pubKeyCredParams: [
-                        { type: "public-key", alg: -7 }, // ES256
-                        { type: "public-key", alg: -257 } // RS256
-                    ],
+                    rp: { name: 'Card Vault', id: window.location.hostname },
+                    user: { id: userId, name: settings.userId, displayName: 'Card Vault User' },
+                    pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
                     timeout: 60000,
                     attestation: 'none',
-                    authenticatorSelection: {
-                        authenticatorAttachment: "platform",
-                        residentKey: "required",
-                        userVerification: 'required'
-                    }
+                    authenticatorSelection: { residentKey: "required", userVerification: 'required' },
                 }
             };
             
-            // Create the credential
-            try {
-                const credential = await navigator.credentials.create(options);
-                
-                if (!credential) {
-                    throw new Error('Failed to create credential');
-                }
-                
-                // Update settings
-                const credentialId = btoa(String.fromCharCode.apply(null, new Uint8Array(credential.rawId)));
-                await StorageModule.saveSettings({
-                    ...settings,
-                    biometricEnabled: true,
-                    biometricCredentialId: credentialId
-                });
-                
-                return true;
-            } catch (credError) {
-                console.error('WebAuthn credential creation error:', credError);
-                throw new Error('Failed to set up biometric: ' + (credError.message || 'Unknown error'));
-            }
+            const credential = await navigator.credentials.create(options);
+            if (!credential) throw new Error('Failed to create credential');
+
+            const credentialId = CryptoModule.arrayBufferToBase64(credential.rawId);
+            await StorageModule.saveSettings({ ...settings, biometricEnabled: true, biometricCredentialId: credentialId });
+
+            return true;
         } catch (error) {
             console.error('Enable biometric error:', error);
-            throw error;
+            throw new Error('Failed to set up biometric: ' + (error.message || 'Unknown error'));
         }
     };
     
     // Disable biometric authentication
     const disableBiometric = async (pin) => {
         try {
-            // First verify PIN
             const isValid = await verifyPin(pin);
+            if (!isValid) throw new Error('PIN is incorrect');
             
-            if (!isValid) {
-                throw new Error('PIN is incorrect');
-            }
-            
-            // Get current settings
             const settings = await StorageModule.getSettings();
-            
-            // Update settings
-            await StorageModule.saveSettings({
-                ...settings,
-                biometricEnabled: false
-            });
+            await StorageModule.saveSettings({ ...settings, biometricEnabled: false, biometricCredentialId: null });
             
             return true;
         } catch (error) {
@@ -261,56 +173,35 @@ const AuthModule = (() => {
         }
     };
     
-    // Authenticate with biometrics
+    // Authenticate with biometrics (step 1 of 2)
     const authenticateWithBiometric = async () => {
         try {
-            if (!await isBiometricAvailable()) {
-                throw new Error('Biometric authentication not available');
-            }
+            if (!(await isBiometricAvailable())) throw new Error('Biometric authentication not available');
 
             const settings = await StorageModule.getSettings();
-
-            if (!settings || !settings.biometricEnabled || !settings.biometricCredentialId) {
-                throw new Error('Biometric authentication not enabled');
-            }
+            if (!settings.biometricEnabled || !settings.biometricCredentialId) throw new Error('Biometric authentication not enabled');
 
             const challengeBytes = new Uint8Array(32);
             window.crypto.getRandomValues(challengeBytes);
-
             const credentialId = CryptoModule.base64ToArrayBuffer(settings.biometricCredentialId);
 
             const options = {
                 publicKey: {
                     challenge: challengeBytes,
-                    allowCredentials: [{
-                        type: 'public-key',
-                        id: credentialId,
-                    }],
+                    allowCredentials: [{ type: 'public-key', id: credentialId }],
                     timeout: 60000,
                     userVerification: 'required',
-                    rpId: window.location.hostname
+                    rpId: window.location.hostname,
                 }
             };
 
-            try {
-                const credential = await navigator.credentials.get(options);
+            const credential = await navigator.credentials.get(options);
+            if (!credential) throw new Error('Biometric authentication failed');
 
-                if (!credential) {
-                    throw new Error('Biometric authentication failed');
-                }
-
-                // If biometric is successful, we still need the PIN to decrypt the master key.
-                // This function will now simply return true, and the UI will handle asking for the PIN.
-                // This is a more secure flow.
-                return true;
-
-            } catch (error) {
-                console.error('WebAuthn error:', error);
-                throw new Error('Biometric authentication failed: ' + (error.message || 'Unknown error'));
-            }
+            return true; // Signal to UI to now ask for PIN
         } catch (error) {
-            console.error('Authenticate with biometric error:', error);
-            throw error;
+            console.error('WebAuthn error:', error);
+            throw new Error('Biometric authentication failed: ' + (error.message || 'Unknown error'));
         }
     };
     
@@ -323,29 +214,20 @@ const AuthModule = (() => {
     
     // Get the encryption key (only if authenticated)
     const getEncryptionKey = () => {
-        if (!isAuthenticated) {
-            throw new Error('Not authenticated');
-        }
+        if (!isAuthenticated) throw new Error('Not authenticated');
         return encryptionKey;
     };
     
     // Check if authenticated
-    const checkAuthenticated = () => {
-        return isAuthenticated;
-    };
+    const checkAuthenticated = () => isAuthenticated;
     
     // Set current PIN (for biometric auth)
-    const setCurrentPin = (pin) => {
-        currentPin = pin;
-    };
+    const setCurrentPin = (pin) => { currentPin = pin; };
     
     // Initialize the module
     const init = async () => {
         try {
-            // Check if biometric is available
-        const biometricAvailable = await isBiometricAvailable();
-            console.log('Biometric authentication available:', biometricAvailable);
-            
+            console.log('Biometric authentication available:', await isBiometricAvailable());
             return true;
         } catch (error) {
             console.error('Auth initialization error:', error);
@@ -355,19 +237,8 @@ const AuthModule = (() => {
     
     // Public API
     return {
-        init,
-        isSetUp,
-        setupPin,
-        verifyPin,
-        changePin,
-        isBiometricAvailable,
-        isBiometricEnabled,
-        enableBiometric,
-        disableBiometric,
-        authenticateWithBiometric,
-        logout,
-        getEncryptionKey,
-        checkAuthenticated,
-        setCurrentPin
+        init, isSetUp, setupPin, verifyPin, changePin,
+        isBiometricAvailable, isBiometricEnabled, enableBiometric, disableBiometric,
+        authenticateWithBiometric, logout, getEncryptionKey, checkAuthenticated, setCurrentPin
     };
 })();
